@@ -323,7 +323,7 @@ input,select,textarea{font-family:inherit;outline:none;border:none}
 <!-- LOADING -->
 <div class="loading-overlay" id="loading">
   <div class="loading-logo">FF</div>
-  <div class="loading-text">Memuat FinFlow...</div>
+  <div class="loading-text" id="loading-text">Memuat FinFlow...</div>
 </div>
 
 <!-- TOAST -->
@@ -1772,50 +1772,40 @@ function genSpark() {
 // BOOT
 // ═══════════════════════════════════════════════════════════════
 async function boot() {
+  // Handle OAuth redirect dari Google (hash fragment di URL)
+  const hash = window.location.hash;
+  if (hash && hash.includes('access_token')) {
+    show('loading');
+    await new Promise(r => setTimeout(r, 2000));
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  }
   const { data: { session } } = await sb.auth.getSession();
   hide('loading');
   if (session?.user) {
     S.user = session.user;
+    show('loading');
     await loadAllData();
+    hide('loading');
     setupApp();
   } else {
     show('landing');
   }
   sb.auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_IN' && session?.user) {
-      hide('landing'); hide('auth-screen'); show('loading');
+      if (S.user && S.user.id === session.user.id) return;
+      hide('landing'); hide('auth-screen');
+      show('loading');
       S.user = session.user;
       await loadAllData();
       hide('loading');
       setupApp();
     } else if (event === 'SIGNED_OUT') {
-      hide('app-shell'); show('landing');
+      S.user = null;
+      hide('app-shell');
+      show('landing');
     }
   });
 }
-function setupApp() {
-  const name = S.profile?.name || S.user?.email?.split('@')[0] || 'Pengguna';
-  const email = S.user?.email || '';
-  const initials = name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
-  document.querySelectorAll('.u-name').forEach(el => el.textContent = name);
-  document.querySelectorAll('#user-avatar, #top-avatar').forEach(el => el.textContent = initials);
-  const menuName = document.getElementById('menu-name');
-  const menuEmail = document.getElementById('menu-email');
-  if (menuName) menuName.textContent = name;
-  if (menuEmail) menuEmail.textContent = email;
-  hide('loading'); hide('landing'); hide('auth-screen');
-  show('app-shell');
-  const now = new Date();
-  const hour = now.getHours();
-  const greeting = hour < 12 ? 'Selamat pagi' : hour < 17 ? 'Selamat siang' : 'Selamat malam';
-  document.getElementById('view-sub').textContent = `${greeting}, ${name.split(' ')[0]}! 👋`;
-  document.getElementById('mobile-nav').style.display = 'block';
-  renderDashboard();
-  setTimeout(initCharts, 200);
-  fetchCryptoPrices();
-  setInterval(fetchCryptoPrices, 60000); // refresh every 60s
-}
-
 window.addEventListener('DOMContentLoaded', boot);
 </script>
 </body>
